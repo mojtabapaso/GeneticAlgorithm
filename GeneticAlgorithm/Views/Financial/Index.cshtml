@@ -1,0 +1,167 @@
+﻿@model List<CompanyFinancial>
+@{
+    var optimized = (List<CompanyFinancial>)ViewBag.OptimizedData;
+}
+
+<canvas id="gpdChart"></canvas>
+
+<div id="detailModal">
+    <h4 style="text-align:center;">📊 جدول مقایسه‌ای GPD</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>پارامتر</th>
+                <th>مقدار واقعی</th>
+                <th>مقدار بهینه‌شده</th>
+            </tr>
+        </thead>
+        <tbody id="detailsTableBody">
+        </tbody>
+    </table>
+    <button class="modal-close-btn" onclick="document.getElementById('detailModal').style.display='none'">بستن</button>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const actualData = @Html.Raw(Json.Serialize(Model));
+        const optimizedData = @Html.Raw(Json.Serialize(optimized));
+
+        const labels = actualData.map(d => d.reportMonth.substring(0, 7));
+        const actualGpd = actualData.map(d => d.gpd);
+        const optimizedGpd = optimizedData.map(d => d.gpd);
+
+        const ctx = document.getElementById('gpdChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'GPD واقعی',
+                        data: actualGpd,
+                        borderColor: 'blue',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'blue',
+                        fill: false
+                    },
+                    {
+                        label: 'GPD بهینه‌شده',
+                        data: optimizedGpd,
+                        borderColor: 'green',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointBackgroundColor: 'green',
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return context.dataset.label + ': ' + Number(context.parsed.y).toLocaleString();
+                            }
+                        }
+                    }
+                },
+                onClick: function (evt) {
+                    const points = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+                    if (points.length > 0) {
+                        const index = points[0].index;
+                        const a = actualData[index];
+                        const o = optimizedData[index];
+
+                        const formatNumber = n => Number(n).toLocaleString('fa-IR');
+
+                        const diffColor = (val1, val2) => {
+                            return val2 > val1 ? 'green' : val2 < val1 ? 'red' : 'black';
+                        };
+
+                        const buildRow = (label, val1, val2) => {
+                            const color = diffColor(val1, val2);
+                            return `<tr>
+                                                <td>${label}</td>
+                                                <td>${formatNumber(val1)}</td>
+                                                <td style="color:${color}; font-weight:bold">${formatNumber(val2)}</td>
+                                            </tr>`;
+                        };
+
+                        const body = `
+                                    <tr><td>ماه</td><td>${a.reportMonth.substring(0, 7)}</td><td>${o.reportMonth.substring(0, 7)}</td></tr>
+                                    ${buildRow("درآمد", a.revenue, o.revenue)}
+                                    ${buildRow("هزینه", a.expense, o.expense)}
+                                    ${buildRow("کارمند", a.employeeCount, o.employeeCount)}
+                                    ${buildRow("مارکتینگ", a.marketingBudget, o.marketingBudget)}
+                                    ${buildRow("GPD", a.gpd, o.gpd)}
+                                `;
+
+                        document.getElementById("detailsTableBody").innerHTML = body;
+                        document.getElementById("detailModal").style.display = "block";
+                    }
+                }
+            }
+        });
+    </script>
+
+    <style>
+        #detailModal {
+            display: none;
+            position: fixed;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 75%;
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            font-family: 'IRANSans', sans-serif;
+            direction: rtl;
+        }
+
+            #detailModal table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+            }
+
+            #detailModal th, #detailModal td {
+                border: 1px solid #ccc;
+                padding: 10px;
+                text-align: center;
+                font-size: 14px;
+            }
+
+            #detailModal thead {
+                background-color: #f0f0f0;
+            }
+
+            #detailModal tr:nth-child(even) {
+                background-color: #fafafa;
+            }
+
+            #detailModal tr:hover {
+                background-color: #eef;
+            }
+
+        .modal-close-btn {
+            margin-top: 20px;
+            background-color: #007bff;
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            float: left;
+        }
+
+            .modal-close-btn:hover {
+                background-color: #0056b3;
+            }
+    </style>
+}
